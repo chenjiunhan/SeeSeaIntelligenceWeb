@@ -52,9 +52,9 @@ export default function ShippingMap({ onShipClick, selectedShip }: ShippingMapPr
 
         // 添加船舶標記
         const ships = [
-          { id: '1', name: 'MAERSK ALPHA', coords: [121.5, 31.2] },
-          { id: '2', name: 'EVERGREEN BETA', coords: [4.4, 51.9] },
-          { id: '3', name: 'COSCO GAMMA', coords: [-118.2, 33.7] }
+          { id: '1', name: 'MAERSK ALPHA', coords: [121.5, 31.2] as [number, number] },
+          { id: '2', name: 'EVERGREEN BETA', coords: [4.4, 51.9] as [number, number] },
+          { id: '3', name: 'COSCO GAMMA', coords: [-118.2, 33.7] as [number, number] }
         ]
 
         ships.forEach(ship => {
