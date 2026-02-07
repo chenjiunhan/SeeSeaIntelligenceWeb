@@ -84,6 +84,7 @@ export default function AIChatBox() {
   }, [messages])
 
   const handleSend = async () => {
+    console.log('🚀 handleSend 被觸發了！')
     if (!input.trim()) return
 
     const userMessage: Message = {
@@ -108,6 +109,8 @@ export default function AIChatBox() {
     try {
       // Connect to SSE stream
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
+      console.log('🔍 DEBUG - NEXT_PUBLIC_API_URL:', process.env.NEXT_PUBLIC_API_URL)
+      console.log('🔍 DEBUG - API_URL:', API_URL)
       const response = await fetch(`${API_URL}/api/v1/chat/stream`, {
         method: 'POST',
         headers: {

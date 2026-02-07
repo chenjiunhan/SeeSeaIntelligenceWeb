@@ -96,8 +96,8 @@ export default function MapTestPage() {
   const [chatPosition, setChatPosition] = useState<{ right?: number; bottom?: number; left?: number; top?: number }>({ right: 30, bottom: 30 });
   const chatDragRef = useRef({ initialX: 0, initialY: 0 });
 
-  const GO_API_URL = process.env.NEXT_PUBLIC_GO_API_URL || 'http://localhost:8081';
-  const PYTHON_API_URL = process.env.NEXT_PUBLIC_PYTHON_API_URL || 'http://localhost:8001';
+  const GO_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081';
+  const PYTHON_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
   const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
 
   // Initialize map
