@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>SeeSea 全球航運地圖</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+    <link href="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.css" rel="stylesheet">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.js"></script>
+    <script src="/config.js"></script>
+    <style>
+        html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+        body { margin: 0 !important; padding: 0 !important; width: 100%; height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; display: block; }
+        #map { position: absolute; top: 0; left: 0; right: 0; bottom: 0; width: 100%; height: 100%; }
+
+        .stats-panel {
+            position: absolute; top: 80px; left: 30px; width: 360px;
+            background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(10px);
+            color: white; padding: 24px; border-radius: 16px; z-index: 1000;
+            border: 1px solid rgba(6, 182, 212, 0.5);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+            cursor: move;
+            user-select: none;
+        }
+
+        .stats-panel h3 {
+            color: #06b6d4; margin: 0 0 20px 0; font-size: 20px;
+            display: flex; align-items: center; gap: 10px;
+        }
+
+        .chokepoint-selector {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .chokepoint-btn {
+            padding: 10px 12px;
+            background: rgba(6, 182, 212, 0.1);
+            border: 1px solid rgba(6, 182, 212, 0.3);
+            border-radius: 8px; color: #94a3b8;
+            cursor: pointer; transition: all 0.3s;
+            font-size: 12px; text-align: center;
+            white-space: nowrap;
+        }
+
+        .chokepoint-btn:hover {
+            background: rgba(6, 182, 212, 0.2);
+            border-color: rgba(6, 182, 212, 0.5);
+            color: #06b6d4;
+        }
+
+        .chokepoint-btn.active {
+            background: rgba(6, 182, 212, 0.3);
+            border-color: #06b6d4;
+            color: #06b6d4;
+            font-weight: 600;
+            box-shadow: 0 0 20px rgba(6, 182, 212, 0.3);
+        }
+
+        .date-range-selector {
+            margin-bottom: 16px;
+            padding: 16px;
+            background: rgba(6, 182, 212, 0.05);
+            border-radius: 8px;
+            border: 1px solid rgba(6, 182, 212, 0.2);
+        }
+
+        .date-range-label {
+            font-size: 12px;
+            color: #94a3b8;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .date-inputs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .date-input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .date-input-group label {
+            font-size: 11px;
+            color: #64748b;
+        }
+
+        .date-inputs input {
+            padding: 8px;
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(6, 182, 212, 0.3);
+            border-radius: 6px;
+            color: #06b6d4;
+            font-size: 12px;
+            font-family: monospace;
+        }
+
+        .date-inputs input:focus {
+            outline: none;
+            border-color: #06b6d4;
+            box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.2);
+        }
+
+        .apply-btn {
+            width: 100%;
+            padding: 8px;
+            background: rgba(6, 182, 212, 0.2);
+            border: 1px solid rgba(6, 182, 212, 0.5);
+            border-radius: 6px;
+            color: #06b6d4;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .apply-btn:hover {
+            background: rgba(6, 182, 212, 0.3);
+            border-color: #06b6d4;
+        }
+
+        .date-info {
+            font-size: 13px; color: #94a3b8; margin-bottom: 20px;
+            padding: 10px; background: rgba(6, 182, 212, 0.1);
+            border-radius: 8px; border-left: 3px solid #06b6d4;
+        }
+
+        .stat-row {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 12px 0; border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .stat-row:last-child { border-bottom: none; }
+
+        .stat-label {
+            font-size: 14px; color: #94a3b8;
+            display: flex; align-items: center; gap: 8px;
+        }
+
+        .stat-value {
+            font-size: 18px; font-weight: 600; color: #06b6d4;
+        }
+
+        .vessel-types {
+            margin-top: 16px; padding-top: 16px;
+            border-top: 1px solid rgba(148, 163, 184, 0.2);
+        }
+
+        .vessel-type {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 8px 0; font-size: 13px;
+        }
+
+        .vessel-type-label { color: #cbd5e1; }
+        .vessel-type-value { color: #10b981; font-weight: 600; }
+
+        .chokepoint-label {
+            background: rgba(15, 23, 42, 0.95);
+            border: 2px solid #06b6d4;
+            border-radius: 8px;
+            padding: 8px 16px;
+            color: #06b6d4;
+            font-weight: 600;
+            font-size: 14px;
+            box-shadow: 0 4px 12px rgba(6, 182, 212, 0.4);
+            white-space: nowrap;
+        }
+
+        .loading { color: #06b6d4; }
+        .error { color: #ef4444; }
+        .success { color: #10b981; }
+
+        /* AI 對話框樣式 */
+        .ai-chat-box {
+            position: fixed;
+            right: 30px;
+            bottom: 30px;
+            width: 400px;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            border: 1px solid rgba(6, 182, 212, 0.5);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+            z-index: 1001;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .ai-chat-box.minimized {
+            height: auto;
+        }
+
+        .ai-chat-header {
+            padding: 16px;
+            background: rgba(30, 41, 59, 0.8);
+            border-radius: 16px 16px 0 0;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: move;
+            user-select: none;
+        }
+
+        .ai-chat-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #06b6d4;
+            font-weight: 600;
+            font-size: 16px;
+        }
+
+        .ai-chat-controls {
+            display: flex;
+            gap: 8px;
+        }
+
+        .ai-chat-btn {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            border: none;
+            background: transparent;
+            color: #94a3b8;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .ai-chat-btn:hover {
+            background: rgba(148, 163, 184, 0.2);
+            color: #06b6d4;
+        }
+
+        .ai-chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            max-height: 400px;
+            min-height: 300px;
+        }
+
+        .ai-message {
+            margin-bottom: 16px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .ai-message.user {
+            flex-direction: row-reverse;
+        }
+
+        .ai-message-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: rgba(6, 182, 212, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        .ai-message-bubble {
+            max-width: 75%;
+            padding: 12px 16px;
+            border-radius: 12px;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .ai-message.ai .ai-message-bubble {
+            background: rgba(30, 41, 59, 0.8);
+            color: #e2e8f0;
+        }
+
+        .ai-message.user .ai-message-bubble {
+            background: rgba(6, 182, 212, 0.3);
+            color: #ffffff;
+        }
+
+        .ai-chat-input {
+            padding: 16px;
+            border-top: 1px solid rgba(148, 163, 184, 0.2);
+            display: flex;
+            gap: 8px;
+        }
+
+        .ai-chat-input input {
+            flex: 1;
+            padding: 12px;
+            background: rgba(30, 41, 59, 0.6);
+            border: 1px solid rgba(6, 182, 212, 0.3);
+            border-radius: 8px;
+            color: #e2e8f0;
+            font-size: 14px;
+        }
+
+        .ai-chat-input input:focus {
+            outline: none;
+            border-color: #06b6d4;
+            box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.2);
+        }
+
+        .ai-chat-input button {
+            padding: 12px 20px;
+            background: #06b6d4;
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .ai-chat-input button:hover {
+            background: #0891b2;
+        }
+    </style>
+</head>
+<body>
+    <div class="stats-panel" id="stats-panel">
+        <h3 id="panel-title">🌊 航運數據</h3>
+
+        <div class="chokepoint-selector">
+            <button class="chokepoint-btn active" data-chokepoint="suez-canal">
+                🇪🇬 蘇伊士運河
+            </button>
+            <button class="chokepoint-btn" data-chokepoint="panama-canal">
+                🇵🇦 巴拿馬運河
+            </button>
+            <button class="chokepoint-btn" data-chokepoint="strait-of-malacca">
+                🇲🇾 麻六甲海峽
+            </button>
+            <button class="chokepoint-btn" data-chokepoint="strait-of-hormuz">
+                🇮🇷 荷莫茲海峽
+            </button>
+            <button class="chokepoint-btn" data-chokepoint="bab-el-mandeb">
+                🇾🇪 曼德海峽
+            </button>
+            <button class="chokepoint-btn" data-chokepoint="bosporus-strait">
+                🇹🇷 博斯普魯斯
+            </button>
+        </div>
+
+        <div class="date-range-selector">
+            <span class="date-range-label">📅 選擇日期範圍</span>
+            <div class="date-inputs">
+                <div class="date-input-group">
+                    <label>開始日期</label>
+                    <input type="date" id="start-date" value="2026-01-01">
+                </div>
+                <div class="date-input-group">
+                    <label>結束日期</label>
+                    <input type="date" id="end-date" value="2026-02-07">
+                </div>
+            </div>
+            <button class="apply-btn" onclick="applyDateRange()">🔍 查詢</button>
+        </div>
+
+        <div class="date-info" id="date-info">請選擇航道與日期範圍...</div>
+        <div id="stats-content">
+            <div class="stat-row">
+                <span class="stat-label">📊 總船舶數</span>
+                <span class="stat-value" id="vessel-count">--</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">📈 平均每日</span>
+                <span class="stat-value" id="avg-daily">--</span>
+            </div>
+            <div class="vessel-types" id="vessel-types"></div>
+        </div>
+        <div style="margin-top: 16px; font-size: 11px; color: #64748b; text-align: center;" id="status">
+            資料來源: Go API
+        </div>
+    </div>
+
+    <div id="map"></div>
+
+    <!-- AI 對話框 -->
+    <div class="ai-chat-box" id="ai-chat-box">
+        <div class="ai-chat-header" id="ai-chat-header">
+            <div class="ai-chat-title">
+                <span>🤖</span>
+                <span>AI 航運助手</span>
+            </div>
+            <div class="ai-chat-controls">
+                <button class="ai-chat-btn" onclick="toggleChatMinimize()">─</button>
+            </div>
+        </div>
+        <div class="ai-chat-messages" id="ai-chat-messages">
+            <div class="ai-message ai">
+                <div class="ai-message-avatar">🤖</div>
+                <div class="ai-message-bubble">
+                    👋 歡迎來到 SeeSea！我是你的航運智能助手。<br><br>
+                    你可以問我：<br>
+                    • 「蘇伊士運河最近的船舶流量如何？」<br>
+                    • 「為什麼這條航線這麼繁忙？」<br>
+                    • 「分析最近一個月的趨勢」
+                </div>
+            </div>
+        </div>
+        <div class="ai-chat-input">
+            <input type="text" id="ai-input" placeholder="問我任何關於航運的問題..." onkeypress="handleChatKeyPress(event)">
+            <button onclick="sendMessage()">發送</button>
+        </div>
+    </div>
+
+    <script>
+        const token = 'pk.eyJ1IjoiamFxcTEwMTAiLCJhIjoiY21sY2QzdHppMHZ4dTNmcjRjb3dtNmpzcCJ9.SibRmPbOquDAtwbuWD7aSw';
+        const GO_API_URL = window.GO_API_URL || 'http://localhost:8081';
+
+        // Chokepoint 位置和資訊
+        const chokepoints = {
+            'suez-canal': {
+                lng: 32.35, lat: 30.0,
+                name: '🌊 蘇伊士運河',
+                zoom: 8
+            },
+            'panama-canal': {
+                lng: -79.91, lat: 9.08,
+                name: '🌊 巴拿馬運河',
+                zoom: 9
+            },
+            'strait-of-malacca': {
+                lng: 100.35, lat: 2.5,
+                name: '🌊 麻六甲海峽',
+                zoom: 7
+            },
+            'strait-of-hormuz': {
+                lng: 56.25, lat: 26.5,
+                name: '🌊 荷莫茲海峽',
+                zoom: 8
+            },
+            'bab-el-mandeb': {
+                lng: 43.3, lat: 12.6,
+                name: '🌊 曼德海峽',
+                zoom: 8
+            },
+            'bosporus-strait': {
+                lng: 29.05, lat: 41.12,
+                name: '🌊 博斯普魯斯海峽',
+                zoom: 10
+            }
+        };
+
+        let currentChokepoint = 'suez-canal';
+        let currentMarker = null;
+
+        // 拖拉功能
+        let isDragging = false;
+        let currentX, currentY, initialX, initialY;
+        const panel = document.getElementById('stats-panel');
+
+        panel.addEventListener('mousedown', dragStart);
+        document.addEventListener('mousemove', drag);
+        document.addEventListener('mouseup', dragEnd);
+
+        function dragStart(e) {
+            // 如果點擊在按鈕或輸入框上，不觸發拖拉
+            if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') {
+                return;
+            }
+
+            initialX = e.clientX - panel.offsetLeft;
+            initialY = e.clientY - panel.offsetTop;
+            isDragging = true;
+        }
+
+        function drag(e) {
+            if (!isDragging) return;
+
+            e.preventDefault();
+            currentX = e.clientX - initialX;
+            currentY = e.clientY - initialY;
+
+            panel.style.left = currentX + 'px';
+            panel.style.top = currentY + 'px';
+        }
+
+        function dragEnd() {
+            isDragging = false;
+        }
+
+        // AI 對話框拖拉功能
+        const chatBox = document.getElementById('ai-chat-box');
+        const chatHeader = document.getElementById('ai-chat-header');
+        let chatDragging = false;
+        let chatInitialX, chatInitialY;
+
+        chatHeader.addEventListener('mousedown', chatDragStart);
+        document.addEventListener('mousemove', chatDrag);
+        document.addEventListener('mouseup', chatDragEnd);
+
+        function chatDragStart(e) {
+            const rect = chatBox.getBoundingClientRect();
+            chatInitialX = e.clientX - rect.left;
+            chatInitialY = e.clientY - rect.top;
+            chatDragging = true;
+        }
+
+        function chatDrag(e) {
+            if (!chatDragging) return;
+            e.preventDefault();
+
+            const x = e.clientX - chatInitialX;
+            const y = e.clientY - chatInitialY;
+
+            chatBox.style.right = 'auto';
+            chatBox.style.bottom = 'auto';
+            chatBox.style.left = x + 'px';
+            chatBox.style.top = y + 'px';
+        }
+
+        function chatDragEnd() {
+            chatDragging = false;
+        }
+
+        // AI 對話框最小化
+        let isChatMinimized = false;
+        const chatMessages = document.getElementById('ai-chat-messages');
+        const chatInput = document.querySelector('.ai-chat-input');
+
+        function toggleChatMinimize() {
+            isChatMinimized = !isChatMinimized;
+            if (isChatMinimized) {
+                chatMessages.style.display = 'none';
+                chatInput.style.display = 'none';
+                chatBox.classList.add('minimized');
+            } else {
+                chatMessages.style.display = 'block';
+                chatInput.style.display = 'flex';
+                chatBox.classList.remove('minimized');
+            }
+        }
+
+        // AI 對話功能
+        const PYTHON_API_URL = window.PYTHON_API_URL || 'http://localhost:8001';
+
+        function addMessage(content, type) {
+            const messagesContainer = document.getElementById('ai-chat-messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `ai-message ${type}`;
+
+            const avatar = document.createElement('div');
+            avatar.className = 'ai-message-avatar';
+            avatar.textContent = type === 'ai' ? '🤖' : '👤';
+
+            const bubble = document.createElement('div');
+            bubble.className = 'ai-message-bubble';
+            bubble.innerHTML = content.replace(/\n/g, '<br>');
+
+            messageDiv.appendChild(avatar);
+            messageDiv.appendChild(bubble);
+            messagesContainer.appendChild(messageDiv);
+
+            // 自動滾動到底部
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+            return bubble;
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('ai-input');
+            const message = input.value.trim();
+
+            if (!message) return;
+
+            // 添加用戶訊息
+            addMessage(message, 'user');
+            input.value = '';
+
+            // 創建 AI 回應氣泡
+            const aiBubble = addMessage('思考中...', 'ai');
+
+            try {
+                const response = await fetch(`${PYTHON_API_URL}/api/v1/chat/stream`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message: message,
+                        session_id: 'user-session-' + Date.now()
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                let aiContent = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
+
+                    for (const line of lines) {
+                        if (line.startsWith('data:')) {
+                            const data = line.substring(5).trim();
+                            try {
+                                const parsed = JSON.parse(data);
+                                if (parsed.content) {
+                                    aiContent += parsed.content;
+                                    aiBubble.innerHTML = aiContent.replace(/\n/g, '<br>');
+                                }
+                            } catch (e) {
+                                // Ignore parse errors
+                            }
+                        }
+                    }
+                }
+
+                if (!aiContent) {
+                    aiBubble.innerHTML = '抱歉，沒有收到回應';
+                }
+
+            } catch (error) {
+                console.error('Chat error:', error);
+                aiBubble.innerHTML = '❌ 連接失敗，請確認 Python API 正在運行';
+            }
+        }
+
+        function handleChatKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        mapboxgl.accessToken = token;
+        const map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/satellite-streets-v12',
+            center: [32.35, 30.0],
+            zoom: 8,
+            projection: 'globe'
+        });
+
+        map.on('load', async () => {
+            // 地球效果
+            map.setFog({
+                color: 'rgb(6, 182, 212)',
+                'high-color': 'rgb(2, 132, 199)',
+                'horizon-blend': 0.02,
+                'space-color': 'rgb(15, 23, 42)',
+                'star-intensity': 0.6
+            });
+
+            // 載入初始資料並顯示標記
+            await applyDateRange();
+            updateChokePointMarker(currentChokepoint);
+        });
+
+        // 更新地圖上的航道標記
+        function updateChokePointMarker(id) {
+            // 移除舊標記
+            if (currentMarker) {
+                currentMarker.remove();
+            }
+
+            const point = chokepoints[id];
+
+            // 創建標記元素
+            const el = document.createElement('div');
+            el.className = 'chokepoint-label';
+            el.textContent = point.name;
+
+            // 添加新標記
+            currentMarker = new mapboxgl.Marker(el)
+                .setLngLat([point.lng, point.lat])
+                .addTo(map);
+        }
+
+        // 切換 chokepoint
+        async function switchChokepoint(id) {
+            if (currentChokepoint === id) return;
+
+            currentChokepoint = id;
+            const point = chokepoints[id];
+
+            // 更新按鈕狀態
+            document.querySelectorAll('.chokepoint-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.chokepoint === id);
+            });
+
+            // 更新地圖標記
+            updateChokePointMarker(id);
+
+            // 飛到新位置
+            map.flyTo({
+                center: [point.lng, point.lat],
+                zoom: point.zoom,
+                duration: 2000,
+                essential: true
+            });
+
+            // 載入資料
+            await applyDateRange();
+        }
+
+        // 綁定按鈕事件
+        document.querySelectorAll('.chokepoint-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                switchChokepoint(btn.dataset.chokepoint);
+            });
+        });
+
+        // 應用日期範圍查詢
+        async function applyDateRange() {
+            const startDate = document.getElementById('start-date').value;
+            const endDate = document.getElementById('end-date').value;
+
+            if (!startDate || !endDate) {
+                alert('請選擇開始和結束日期');
+                return;
+            }
+
+            if (startDate > endDate) {
+                alert('開始日期不能晚於結束日期');
+                return;
+            }
+
+            await loadVesselData(currentChokepoint, startDate, endDate);
+        }
+
+        async function loadVesselData(chokepoint, startDate, endDate) {
+            const dateInfo = document.getElementById('date-info');
+            const status = document.getElementById('status');
+            const panelTitle = document.getElementById('panel-title');
+
+            try {
+                dateInfo.innerHTML = '<span class="loading">🔄 載入資料...</span>';
+                panelTitle.textContent = chokepoints[chokepoint].name;
+
+                // 取得日期範圍資料
+                const url = `${GO_API_URL}/api/v1/vessels/${chokepoint}?start_date=${startDate}&end_date=${endDate}`;
+                const res = await fetch(url);
+                const data = await res.json();
+
+                if (data.data && data.data.length > 0) {
+                    // 計算總數和平均值
+                    const totalVessels = data.data.reduce((sum, d) => sum + d.vessel_count, 0);
+                    const totalContainer = data.data.reduce((sum, d) => sum + d.container, 0);
+                    const totalDryBulk = data.data.reduce((sum, d) => sum + d.dry_bulk, 0);
+                    const totalGeneralCargo = data.data.reduce((sum, d) => sum + d.general_cargo, 0);
+                    const totalRoro = data.data.reduce((sum, d) => sum + d.roro, 0);
+                    const totalTanker = data.data.reduce((sum, d) => sum + d.tanker, 0);
+                    const avgDaily = (totalVessels / data.data.length).toFixed(1);
+
+                    // 更新日期範圍資訊
+                    dateInfo.innerHTML = `
+                        📅 ${startDate} ~ ${endDate}<br>
+                        <small style="color:#64748b">${data.data.length} 天資料</small>
+                    `;
+
+                    // 更新總數和平均
+                    document.getElementById('vessel-count').textContent = totalVessels.toLocaleString();
+                    document.getElementById('avg-daily').textContent = avgDaily;
+
+                    // 更新船舶類型
+                    const vesselTypes = document.getElementById('vessel-types');
+                    vesselTypes.innerHTML = `
+                        <div class="vessel-type">
+                            <span class="vessel-type-label">🚢 貨櫃船</span>
+                            <span class="vessel-type-value">${totalContainer.toLocaleString()}</span>
+                        </div>
+                        <div class="vessel-type">
+                            <span class="vessel-type-label">⛴️ 散裝船</span>
+                            <span class="vessel-type-value">${totalDryBulk.toLocaleString()}</span>
+                        </div>
+                        <div class="vessel-type">
+                            <span class="vessel-type-label">🛳️ 雜貨船</span>
+                            <span class="vessel-type-value">${totalGeneralCargo.toLocaleString()}</span>
+                        </div>
+                        <div class="vessel-type">
+                            <span class="vessel-type-label">🚗 滾裝船</span>
+                            <span class="vessel-type-value">${totalRoro.toLocaleString()}</span>
+                        </div>
+                        <div class="vessel-type">
+                            <span class="vessel-type-label">🛢️ 油輪</span>
+                            <span class="vessel-type-value">${totalTanker.toLocaleString()}</span>
+                        </div>
+                    `;
+
+                    status.innerHTML = '<span class="success">✅ 資料載入成功</span>';
+                } else {
+                    dateInfo.innerHTML = '<span class="error">❌ 此日期範圍無資料</span>';
+                    document.getElementById('vessel-count').textContent = '0';
+                    document.getElementById('avg-daily').textContent = '0';
+                    document.getElementById('vessel-types').innerHTML = '';
+                }
+
+            } catch(e) {
+                dateInfo.innerHTML = `<span class="error">❌ 載入失敗</span>`;
+                status.innerHTML = `<span class="error">錯誤: ${e.message}</span>`;
+                console.error('API Error:', e);
+            }
+        }
+    </script>
+</body>
+</html>
