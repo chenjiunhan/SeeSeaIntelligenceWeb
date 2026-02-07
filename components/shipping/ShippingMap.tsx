@@ -26,7 +26,7 @@ export default function ShippingMap({ onShipClick, selectedShip }: ShippingMapPr
       if (!mapContainer.current) return
 
       // @ts-ignore
-      const mapboxgl = window.mapboxgl
+      const mapboxgl = window.mapboxgl as any
       mapboxgl.accessToken = MAPBOX_TOKEN
 
       map.current = new mapboxgl.Map({
